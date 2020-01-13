@@ -8,59 +8,55 @@ dpar <- list(
     
     #vars to filter by
     filterVars = list(
-      soilec = "/lustre/projects/ecosystems/sbsc/ucrb/GIS/UCRB_Covariates/ec_0to60cm_100xInt_ucrb.tif",
-      soilps = "/lustre/projects/ecosystems/sbsc/ucrb/GIS/UCRB_Covariates/UCRB_mPSC_RFE_10plus.tif"
+      soilec = "/home/steve/data/DART2/rasters_input/ec_0to60cm_100xInt_ucrb.tif",
+      soilps = "/home/steve/data/DART2/rasters_input/UCRB_mPSC_RFE_10plus.tif"#,
+#      vegPotential = "/home/steve/data/GIS_ARCHIVE/Landfire/intermediate.grd"
     ),
 
-    # masking variables: 1 = ok, 0 = mask
+    # masking variables: 1 = mask, 0 = ok
     maskVars = list(
-      refrast =  "/lustre/projects/ecosystems/sbsc/ucrb/GIS/MASKS/refrast.tif",
-      roadrast =  "/lustre/projects/ecosystems/sbsc/ucrb/GIS/MASKS/TIGER_2018_ucrb_mask.tif",
-      otherpads =  "/lustre/projects/ecosystems/sbsc/ucrb/GIS/MASKS/WYCOriv_Nopads.tif",
-      oilgas =      "/lustre/projects/ecosystems/sbsc/ucrb/GIS/MASKS/oil_gas_buf_ucrb_mask.tif",
-      oilgas4corners= "/lustre/projects/ecosystems/sbsc/ucrb/GIS/MASKS/fourCorners_oilgas_mask.tif",
-      othersites =  "/lustre/projects/ecosystems/sbsc/ucrb/GIS/MASKS/treatment_mask.tif",
-      disturbance = '/lustre/projects/ecosystems/sbsc/ucrb/GIS/LANDFIRE/disturbance/allDist2.tif',
-      exclosures = "/lustre/projects/ecosystems/sbsc/ucrb/GIS/MASKS/mfo_exclosures_mask.tif",
-      fires= "/lustre/projects/ecosystems/sbsc/ucrb/GIS/MASKS/mtbs_mask.tif",
-      utblmfires= '/lustre/projects/ecosystems/sbsc/ucrb/GIS/MASKS/utfire_mask.tif',
-     irrigated =  "/lustre/projects/ecosystems/sbsc/ucrb/GIS/MASKS/WYCOrivnotIrrigated.tif",
-     coal = "/lustre/projects/ecosystems/sbsc/ucrb/GIS/MASKS/NoCoalCOriv.tif",
-     wind = "/lustre/projects/ecosystems/sbsc/ucrb/GIS/MASKS/WY_COriv_nowind.tif",
-#      nlcd = "/lustre/projects/ecosystems/sbsc/ucrb/GIS/MASKS/NLCDcl.tif",
-      nlcdBuf = "/lustre/projects/ecosystems/sbsc/ucrb/GIS/MASKS/nlcdMask.tif",
-#      hasPJ = "/lustre/projects/ecosystems/sbsc/ucrb/GIS/MASKS/espHasPJ.tif" 
-   ),
+      refrast =  "/home/steve/data/DART2/rasters_input/refrast.tif",
+      roadrast =  "/home/steve/data/GIS_ARCHIVE/ROADS/TIGER2018/TIGER_2018_UCRB_MASK.tif",
+      otherpads =  "/home/steve/data/DART2/rasters_input/WYCOriv_Nopads.tif",
+      oilgas =      "/home/steve/data/GIS_ARCHIVE/OILGAS/pads4corners2016/oil_gas_buf_ucrb_mask.tif",
+      othersites =  "/home/steve/data/GIS_ARCHIVE/MANAGEMENT/mask.grd",
+      exclosures = "/home/steve/data/GIS_ARCHIVE/MANAGEMENT/MFO_EXCLOSURES/mfo_exclosures_mask.grd",
+      fires= "/home/steve/data/GIS_ARCHIVE/MTBS/mtbs_mask.tif",
+      utblmfires= '/home/steve/data/GIS_ARCHIVE/UTFIRES/utfire_mask.tif',
+      irrigated =  "/home/steve/data/DART2/rasters_input/WYCOrivnotIrrigated.tif",
+      coal = "/home/steve/data/DART2/rasters_input/NoCoalCOriv.tif",
+      wind = "/home/steve/data/DART2/rasters_input/WY_COriv_nowind.tif",
+      nlcd = "/home/steve/data/GIS_ARCHIVE/UCRB_Covariates/NLCDcl.tif"
+    ),
 
     # variables for distance matrix
     topoVars = list(
-        ELEVm = "/lustre/projects/ecosystems/sbsc/ucrb/GIS/UCRB_Covariates/ELEVm.tif",
-        PCURV = "/lustre/projects/ecosystems/sbsc/ucrb/GIS/UCRB_Covariates/PCURV.tif",
-        TCURV = "/lustre/projects/ecosystems/sbsc/ucrb/GIS/UCRB_Covariates/TCURV.tif",
-        RELHT1 ="/lustre/projects/ecosystems/sbsc/ucrb/GIS/UCRB_Covariates/RELHT1.tif",
-        RELHT32 ="/lustre/projects/ecosystems/sbsc/ucrb/GIS/UCRB_Covariates/RELHT32.tif",
-        RELHT128 ="/lustre/projects/ecosystems/sbsc/ucrb/GIS/UCRB_Covariates/RELHT128.tif",
-        RELMNHT1 ="/lustre/projects/ecosystems/sbsc/ucrb/GIS/UCRB_Covariates/RELMNHT1.tif",
-        RELMNHT32 ="/lustre/projects/ecosystems/sbsc/ucrb/GIS/UCRB_Covariates/RELMNHT32.tif",
-        RELMNHT128 ="/lustre/projects/ecosystems/sbsc/ucrb/GIS/UCRB_Covariates/RELMNHT128.tif",
-        MRRTF ="/lustre/projects/ecosystems/sbsc/ucrb/GIS/UCRB_Covariates/MRRTF.tif",
-        MRVBF ="/lustre/projects/ecosystems/sbsc/ucrb/GIS/UCRB_Covariates/MRVBF.tif",
-        SLOPE ="/lustre/projects/ecosystems/sbsc/ucrb/GIS/UCRB_Covariates/SLOPE.tif",
-        SOUTHNESS ="/lustre/projects/ecosystems/sbsc/ucrb/GIS/UCRB_Covariates/SOUTHNESS.tif",
-        EASTNESS ="/lustre/projects/ecosystems/sbsc/ucrb/GIS/UCRB_Covariates/EASTNESS.tif",
-        TWI_TOPMODEL="/lustre/projects/ecosystems/sbsc/ucrb/GIS/UCRB_Covariates/TWI_TOPMODEL.tif",
-        CAlog_10="/lustre/projects/ecosystems/sbsc/ucrb/GIS/UCRB_Covariates/CAlog_10.tif",
-        LFELEMS="/lustre/projects/ecosystems/sbsc/ucrb/GIS/UCRB_Covariates/LFELEMS.tif"
+        ELEVm = "/home/steve/data/GIS_ARCHIVE/UCRB_Covariates/ELEVm.tif",
+        PCURV = "/home/steve/data/GIS_ARCHIVE/UCRB_Covariates/PCURV.tif",
+        TCURV = "/home/steve/data/GIS_ARCHIVE/UCRB_Covariates/TCURV.tif",
+        RELHT1 ="/home/steve/data/GIS_ARCHIVE/UCRB_Covariates/RELHT1.tif",
+        RELHT32 ="/home/steve/data/GIS_ARCHIVE/UCRB_Covariates/RELHT32.tif",
+        RELHT128 ="/home/steve/data/GIS_ARCHIVE/UCRB_Covariates/RELHT128.tif",
+        RELMNHT1 ="/home/steve/data/GIS_ARCHIVE/UCRB_Covariates/RELMNHT1.tif",
+        RELMNHT32 ="/home/steve/data/GIS_ARCHIVE/UCRB_Covariates/RELMNHT32.tif",
+        RELMNHT128 ="/home/steve/data/GIS_ARCHIVE/UCRB_Covariates/RELMNHT128.tif",
+        MRRTF ="/home/steve/data/GIS_ARCHIVE/UCRB_Covariates/MRRTF.tif",
+        MRVBF ="/home/steve/data/GIS_ARCHIVE/UCRB_Covariates/MRVBF.tif",
+        SLOPE ="/home/steve/data/GIS_ARCHIVE/UCRB_Covariates/SLOPE.tif",
+        SOUTHNESS ="/home/steve/data/GIS_ARCHIVE/UCRB_Covariates/SOUTHNESS.tif",
+        EASTNESS ="/home/steve/data/GIS_ARCHIVE/UCRB_Covariates/EASTNESS.tif",
+        TWI_TOPMODEL="/home/steve/data/GIS_ARCHIVE/UCRB_Covariates/TWI_TOPMODEL.tif",
+        CAlog_10="/home/steve/data/GIS_ARCHIVE/UCRB_Covariates/CAlog_10.tif",
+        LFELEMS="/home/steve/data/GIS_ARCHIVE/UCRB_Covariates/LFELEMS.tif"
     ),
 
 
     ## response variables
     respVars = list(
-     iqr = "/lustre/projects/ecosystems/sbsc/ucrb/GIS/EE/satvi_iqr_MarNov/iqr.vrt",
-     med = "/lustre/projects/ecosystems/sbsc/ucrb/GIS/EE/satvi-median-MarNov/median.vrt",
-     bare = "/lustre/projects/ecosystems/sbsc/ucrb/GIS/rap/bare_vrt/rapBare.vrt"
+     satvi = "/home/steve/data/GIS_ARCHIVE/EE/SATVI/satvi_median_1984_2018_Mar_Nov.vrt"
     )
+    
 
-    )
 
 )
+

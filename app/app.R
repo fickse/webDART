@@ -11,6 +11,7 @@
     User shown a map
     User specifies coordinates (click)
     User specifies key Dart Parameters
+
         Area to average over
         Buffer size
         Search radius
@@ -22,7 +23,7 @@
       Stats about similarity
 "
 
-
+cat('starting\n')
 library(shiny)
 library(leaflet)
 library(raster)
@@ -32,6 +33,7 @@ library(raster)
 
 # get functions
 source('functions.R')
+source('params.R')
 
 #d <- getDart( -110.22, 38.478)
 load('exampleDartRun.RData')
@@ -52,7 +54,7 @@ ui <- bootstrapPage(
     
     tags$style(type = "text/css", "html, body {width:100%;height:100%}"),
     
-
+    uiOutput("test"),
     ################
     # Map          #
     ################
@@ -150,13 +152,27 @@ server <- function(input, output, session) {
    # pull dart results
    observeEvent(input$runDart,
       {
-        
-       # dartResult <- getDart( x = v$lng, y = v$lat, buffer = input$buffer,
-                              # searchRadius = input$searchRadius,
-                              # targetRadius = input$targetRadius,
-                              # nControl = input$nControl)
+            showModal(modalDialog("Running Dart", footer=NULL))
+            attempt <- try({ getDart( x = v$lng, y = v$lat, buffer = input$buffer,
+                               searchRadius = input$searchRadius,
+                               targetRadius = input$targetRadius,
+                               nControl = input$nControl) })
+            
+            removeModal()
+            if(class(attempt) == 'try-error'){
+
+               showNotification(
+                             attempt,duration = NULL, type = 'error'
+                       )
+               dartResult <- v$dartResult
+            } else {
+
+                dartResult <- attempt
+
+            }
                               
-      dartResult <- v$dartResult
+      #dartResult <- v$dartResult
+      v$dartResult <- dartResult
       chosen <- raster(dartResult$chosenPixels['distance'])
       targetRast <- raster(dartResult$targetRast['refrast'])
       cz <- colorNumeric(cols, values(chosen), na.color = "transparent")
@@ -191,11 +207,15 @@ server <- function(input, output, session) {
   
   # Data prepper
   datasetInput <- reactive({
-  
-    ref <- as.data.frame(project(v$dartResult$chosenPixels))
-    target <- as.data.frame(project(v$dartResult$targetRast))
+    require(data.table)
+    ref <- as.data.table(project(v$dartResult$chosenPixels))
+    target <- as.data.table(project(v$dartResult$targetRast))
     ref$type <- 'dartReference'
     target$type <- 'target'
+
+    str(ref)
+    str(target)
+    cat('im here\n')
     
     meta <- jsonlite::toJSON( list(  lat = v$lat, lng = v$lng, date = Sys.time(), 
                         targetRadius = input$targetRadius,
@@ -209,7 +229,8 @@ server <- function(input, output, session) {
     metadata$soilec <- meta
     
     
-    out <- data.table::rbindlist(list(metadata, target, ref), fill = TRUE)
+   # out <- data.table::rbindlist(list(metadata, target, ref), fill = TRUE)
+    out <- data.table::rbindlist(list(target, ref), fill = TRUE)
     out <- out[ , list( type, x, y, freq, distance, soilps, soilec)]
     
     setnames(out, 'freq', 'freqSelected')
@@ -245,8 +266,8 @@ server <- function(input, output, session) {
   output$mymessage <- renderPrint({
         print(v$msg)
   })
-  
-  
+
+    
 }
 
 
