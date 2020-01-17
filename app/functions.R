@@ -250,3 +250,248 @@ topoSubset <- function( targetRaster, edaphicRaster, nControl){
       
       out
 }
+
+
+extractDart <- function( dartOutput, variable ){
+
+    # extract response data from dart output
+    # bfile = path to brick of things to extract
+    # f = filename
+    # rename = replace original file with 'renamed' file
+    
+    cat('loading response variables\n');flush.console()
+    
+    BB <- brick(dpar$respVars[[variable]])
+    
+    bx <- rbind(dartOutput$targetRast[,1], dartOutput$chosenPixels[,1])
+    
+    m <- crop(BB, bx, progress = 'text')
+    
+    cat('extracting padvals\n') ; flush.console()
+    padvals <- list( extract(m, dartOutput$targetRast, progress = 'text'))
+    names(padvals) <- variable
+    
+    cat('extracting reference vals\n') ; flush.console()
+    allvals <- list(extract(m, dartOutput$chosenPixels, progress = 'text'))
+    names(allvals) <- variable
+    
+    return( list( target = padvals, reference = allvals) )
+
+}
+
+synthCtrl <- function( extraction , firstYear , variable){
+
+  
+    #CI wants matrix with first column = treated
+    # No NAs!
+    
+    trt <- colMeans( extraction$target[[variable]])
+    ctr <- extraction$reference[[variable]]
+
+
+    #rearrange
+    X <- cbind(trt, t(ctr))
+    
+    # pre and post
+    pre <- c(1, grep( (firstYear - 1) , 1984:2020))
+    post <- c( grep( firstYear , 1984:2020), nrow(X) )
+    
+     colnames(X) <- NULL
+     rownames(X) <- as.character(c(1984:2020)[1:nrow(X)])
+
+    y <- CausalImpact::CausalImpact(X, pre.period = pre, post.period  =post)
+
+    return(y)
+    
+  }
+
+
+
+getQuantiles <- function(extraction, variable){
+
+  tg <- data.frame(extraction$target[[variable]])
+  ref <- data.frame(extraction$reference[[variable]])
+  
+  # namer -- change this!
+  names(tg) <- names(ref) <- paste0('x', 1:ncol(tg))
+  
+  tg$id <- paste0('tg', 1:nrow(tg))
+  tg <- melt(tg, id = 'id')
+
+  ref$id <- paste0('rf', 1:nrow(ref))
+  ref <- melt(ref, id = 'id')
+
+  r <- rbind(tg, ref)
+  r$group <- ifelse( grepl('rf', r$id), 'Reference', 'Treated')
+  
+  r$xval <- as.numeric( gsub('[^0-9]', '', r$variable))
+  r$xval <- c(1984:2020)[r$xval]
+  
+  r <- data.table(na.omit(r))
+  setorder(r, id)
+  
+  ## plot Quantile trajectory
+  v <- r[, ecdf(value[which(group != 'Treated')])( value[which(group == 'Treated')] ), by = list(xval)]
+  v[,id:= 1:.N, by = list(xval)]
+  V <- dcast(v, xval  ~ id, value.var = 'V1')  
+  names(V) <- paste0('pixel_', names(V),'_', variable, '_quantile')
+  names(V)[grep('xval', names(V))] <- 'year'
+  
+  V[[paste0('avg_', variable, '_quantile')]] <- rowMeans(V[, -c('year'), with = F])
+  V <- V[, c(1, ncol(V), 2:(ncol(V)-1)), with = F]
+  
+  as.data.frame(V)
+
+}
+
+
+
+
+
+ts_plot <- function( extraction, variable){
+
+
+  require(ggplot2)
+  require(data.table)
+  require(gridExtra)
+  library(ggridges)
+  
+  # str(extraction)
+  # str(variable)
+  tg <- data.frame(extraction$target[[variable]])
+  ref <- data.frame(extraction$reference[[variable]])
+  
+  # namer -- change this!
+  names(tg) <- names(ref) <- paste0('x', 1:ncol(tg))
+  
+  tg$id <- paste0('tg', 1:nrow(tg))
+  tg <- melt(tg, id = 'id')
+
+  ref$id <- paste0('rf', 1:nrow(ref))
+  ref <- melt(ref, id = 'id')
+
+  r <- rbind(tg, ref)
+  r$group <- ifelse( grepl('rf', r$id), 'Reference', 'Treated')
+  
+  r$xval <- as.numeric( gsub('[^0-9]', '', r$variable))
+  r$xval <- c(1984:2020)[r$xval]
+  
+  r <- data.table(na.omit(r))
+  setorder(r, id)
+  
+  ## plot Quantile trajectory
+  v <- r[, ecdf(value[which(group != 'Treated')])(value[which(group == 'Treated')] ), by = list(xval)]
+  v[,id:= 1:.N, by = list(xval)]
+  p1 <- ggplot(v, aes(x = xval, y = V1, group = id) ) + geom_line(col = 'red', size= .6, alpha = .25) + ylim(0,1) + theme_bw() + ylab('quantile') + xlab('time') + ggtitle( paste0( variable, 'quantile'))
+  
+  v <- r[, list( 
+                treated = mean(value[ which(group == 'Treated')]), 
+                refUp = max(value[ which(group != 'Treated')]),
+                refDn = min(value[ which(group != 'Treated')]), 
+                iqrUp = quantile(value[ which(group != 'Treated')], .75, na.rm = TRUE),
+                iqrDn = quantile(value[ which(group != 'Treated')], .25, na.rm = TRUE)), by = xval]
+
+  v <- r[, list( 
+                treated = mean(value), 
+                refUp = mean(value) + sd(value),#/sqrt(.N),
+                refDn = mean(value) - sd(value))#/sqrt(.N)) 
+                , by = list(group,xval)]
+
+  p2 <- ggplot(v, aes(x = xval, y = treated, color = group, fill = group) ) + geom_ribbon(aes(ymin=refDn, ymax=refUp, x=xval), alpha = 0.3,colour = NA) + scale_color_manual(values=c("#999999", "red", "#56B4E9")) + scale_fill_manual(values=c("#999999", "#E69F00", "#56B4E9")) +
+  geom_line( size  =2) + theme_bw() + xlab('Time') + ylab(variable) + theme(legend.position="top", legend.title = element_blank())
+ 
+   
+   trted <- data.table(r)[group == 'Treated', list(val = mean(as.numeric(value)), ysmol = unique(as.numeric(xval))), by = list(xval = as.factor(xval))]
+  trted$ybig <- trted$ysmol + .9
+  trted <- na.omit(trted)
+  qs <- quantile(r$value, c(0.001, 0.999))
+ 
+ # Fig1 <- ggplot( r, aes( x = value, y = as.factor(xval), fill = 0.5 - abs(0.5 - stat(ecdf)))) + 
+     # stat_density_ridges(geom = 'density_ridges_gradient', calc_ecdf = TRUE, scale = .9) 
+  # ingredients <- ggplot_build(Fig1) %>% purrr::pluck("data", 1)
+
+  
+  p3 <-   ggplot( r, aes( x = value, y = as.factor(xval), fill = stat(x))) + 
+      geom_density_ridges_gradient(scale = .9) + 
+     # stat_density_ridges(geom = 'density_ridges_gradient', calc_ecdf = TRUE, scale = .9) + 
+      scale_fill_viridis_c(option = 'C')+ 
+      #coord_flip() +
+      coord_cartesian(xlim = qs) +
+      geom_segment(data = trted, aes(x = val, y = ysmol, xend = val, yend = ybig)) + 
+      theme_bw() + theme(legend.position="none") + ylab('') + xlab(variable)
+  
+
+  grid.arrange(p2,p1,p3, layout_matrix = matrix(c(1,2,1,2,3,3),2, 3))
+
+ 
+  
+}
+
+
+viewImportance <- function(d){
+  require(rpart)
+  
+  dat <- d$chosenPixels@data
+ # cat('=====\n',names(key)[which(!names(key) %in% names(dat))], '\n=====\n', file = stderr())
+  key <- c(
+  'EASTNESS' = "Eastness",#	index from 1 to -1  of how east (1) or west (-1) a site faces 
+  'SOUTHNESS' = 'Southness',#	index from 1 to -1  of how south (1) or north (-1) a site faces 
+  'ELEVm' = 'Elev', #	elevation in meters
+  'TCURV' = "Cross Slope Curvature",#	curvature perpendicular to the slope direction 
+  'PCURV' = "Down Slope Curvature",	#curvature parallel to the slope direction
+  "SLOPE" = "Slope",	#slope gradient in degrees 
+  "MRRTF" = "Ridgetop Flatness",#	multiple resolution ridgetop flatness index 
+  "MRVBF" = "Valley Flatness", #	multiple resolution valley bottom flatness index
+  "RELHT1" = "Rel  Height 1m", #Height of cell above the local minimum elevation in 1-pixel radius
+  "RELHT32" = "Rel Height 32m", # Height of cell above the local minimum elevation in 32-pixel radius
+  "RELHT128" = "Rel  Height 128m", #	Height of cell above the local minimum elevation in 128-pixel radius
+  "RELMNHT1" = "Rel  Mean Height 1m",#	Height of cell above the local mean elevation in 1-pixel radius
+  "RELMNHT32"= "Rel  Mean Height 32m",#	Height of cell above the local mean elevation in 32-pixel radius
+  "RELMNHT128"= "Rel  Mean Height 128m",#	Height of cell above the local mean elevation in 128-pixel radius
+  "TWI_TOPMODEL" = "Topo  Wetness Index",#	Topographic wetness index from topmodel in SAGA GIS.
+  "CAlog_10" = "Upslope contrib  area", #	Upslope contributing area in log10 units
+  "LFELEMS" = "Landform Class", #	Landform classification system using DEM: landform elements
+  "distance" = "topoDistance"
+  )
+
+  dat <- dat[, names(key)]
+ # cat('=====\n',names(key)[which(!names(key) %in% names(dat))], '\n=====\n', file = stderr())
+  dat$LFELEMS <- as.factor(dat$LFELEMS)
+  names(dat) <- key
+  # cat('=====\n',names(dat), '\n=====\n', file = stderr())
+  # cat('=====\n',dim(dat), '\n=====\n', file = stderr())
+  # cat('=====\n',str(dat), '\n=====\n', file = stderr())
+  dis <- rpart(topoDistance ~ . , dat)
+  # dis <- rpart(distance ~ . , dat)
+  return( visNetwork::visTree(dis, digits = 2, legend = FALSE, height= '100%',submain = "Factors related to topographic distance"))
+}
+
+
+generateRmdReport <- function(file, params){
+        
+        # Copy the report file to a temporary directory before processing it, in
+        # case we don't have write permissions to the current working dir (which
+        # can happen when deployed).
+        td <- tempdir()
+        tempReport <- file.path( td, "report.Rmd")
+        
+        
+        # generate static images for report
+        mapview::mapshot(params$bigMap, file = file.path(td,'overviewimage.png'))
+        mapview::mapshot(params$smallMap, file = file.path(td,'smallmap.png'))
+        mapview::mapshot(params$dartMap, file = file.path(td,'dartmap.png'))
+        
+        
+        file.copy("dartReport.rmd", tempReport, overwrite = TRUE)
+        
+
+
+        # Knit the document, passing in the `params` list, and eval it in a
+        # child of the global environment (this isolates the code in the document
+        # from the code in this app).
+        rmarkdown::render(tempReport, output_file = file,
+          params = params,
+          envir = new.env(parent = globalenv())
+        )
+
+}

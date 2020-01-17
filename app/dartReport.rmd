@@ -1,0 +1,72 @@
+---
+title: "Dart Report"
+output: pdf_document
+params:
+  dartParams: NA
+  extraction: NA
+  dartOutput: NA
+  sc: NA
+  bigMap: NA
+  smallMap: NA
+  dartMap: NA
+  
+---
+
+# Metadata 
+
+```{r echo=FALSE} 
+    
+    dp <- params$dartParams
+    kv <- c(dartVersion = '2.0', lat = dp$lat, lng = dp$lng, date = format(Sys.time(), '%Y-%m-%d %H:%M:%S'), 
+                        targetRadius = dp$targetRadius,
+                        searchRadius = dp$searchRadius,
+                        buffer = dp$buffer,
+                        nControl = dp$nControl,
+                        synthControlStartYear = dp$synthControlStartYear)
+    meta <- data.frame(id = names(kv), value = kv)
+    row.names(meta) <- NULL
+    knitr::kable(meta)
+```
+
+
+# Maps
+
+![overview](overviewimage.png)
+![selected](smallmap.png)
+
+
+# Dart Pixels
+![dart](dartmap.png)
+
+
+# Variable Importance
+
+```{r echo=FALSE}
+
+viewImportance(params$dartOutput)
+
+```
+
+# Quantiles
+
+
+```{r echo=FALSE}
+
+  ts_plot(params$extraction, 'SATVI')
+
+```
+
+# Synthetic Control
+
+
+```{r echo=FALSE}
+
+   plot(params$sc)
+
+
+```
+
+
+
+
+

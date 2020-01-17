@@ -27,6 +27,8 @@ cat('starting\n')
 library(shiny)
 library(leaflet)
 library(raster)
+library(data.table)
+library(visNetwork)
 
 # Load parameters object ("dpar") with path names and defaults from file
 #source('params.R') 
@@ -42,6 +44,7 @@ cat('loaded\n')
 ss <- spTransform(ss, projection(raster()))
 print(ss)
 
+mapTilesUrlTemplate = '//server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 x = -110.22
 y = 38.478
 buffer = 60
@@ -50,11 +53,14 @@ nControl = 100
 targetRadius = 30
 debugMessage = TRUE
 
-ui <- bootstrapPage(
+
+ui <- navbarPage('webDART', id = 'nav', inverse = TRUE, collapsible = FALSE,position = 'fixed-bottom',
+
+  tabPanel("Interactive Map",
+   div(class="outer",  style = "position: fixed; top: 0; left: 0; right: 0; bottom: 0; overflow: hidden; padding: 0;",value = 'mapPanel',
+    #tags$style(type = "text/css", "html, body {width:100%;height:100%}"),
     
-    tags$style(type = "text/css", "html, body {width:100%;height:100%}"),
     
-    uiOutput("test"),
     ################
     # Map          #
     ################
@@ -67,17 +73,29 @@ ui <- bootstrapPage(
       style = "opacity: 0.92", draggable= TRUE, top = 10, left = 50,  width = 500,
       HTML('<button data-toggle="collapse" data-target="#demox">Menu</button>'),
       tags$div(id='demox', class="collapse", 
-          #verbatimTextOutput('mymenu'),
+
           wellPanel(
-          actionButton("runDart", "Run Dart"), downloadButton("export", "Export"),
+          actionButton("runDart", "Run Dart"),# actionButton('analyze', 'Analyze'),
           sliderInput("targetRadius", "Target Area Radius (m)", min = 0, max = 300, step = 30, value = 30), 
           sliderInput("searchRadius", "Search Area Radius (m)", min = 500, max = 6000, step = 500, value = 3000),
           sliderInput("buffer", "Buffer Around Target Area (m)", min = 0, max = 300, step = 30, value = 60),
-          sliderInput("nControl", "Number of Reference Pixels to Return", min = 1, max = 300, step = 1, value = 100)
+          sliderInput("nControl", "Number of Reference Pixels to Return", min = 1, max = 300, step = 1, value = 100),
+          sliderInput("dDate", "Year of First Disturbance (For Synthetic Control)", sep = '', min = 1991, max = 2018, step = 1, value = 1991)
+          
           )
        )
       ),
-        
+     
+     ###############
+     # Plot Panel  #
+     ###############
+     # conditionalPanel(style = "opacity: 0.92 bottom:0, right:'auto' width:'90%' height:300", 
+                    # condition = "input.analyze!==0",
+                    # icon('hand-point-down', class = "fa-9x", lib = "font-awesome"),
+                    # tags$h3("Plots"),
+                    # plotOutput("myplot", click = 'plot_click', height = 400, width = 900)
+                    # ),
+    
     ################
     # Debug window #
     ################
@@ -91,6 +109,39 @@ ui <- bootstrapPage(
         )
       )
     }
+    
+   )
+  ),
+    
+
+    ###############
+    # Plot Panel  #
+    ###############
+    
+  tabPanel("Analysis", value = 'analysisPanel',
+    #div(class="outer",  style = "position: relative; top: 0; left: 0; right: 0; bottom: 0; overflow: hidden; padding: 0;",
+     tabsetPanel(
+      tabPanel("Quantiles",plotOutput("myplot", height = 'auto')), 
+      tabPanel("Synthetic Control", plotOutput("scPlot")),
+      tabPanel("Variable Importance", visNetworkOutput('cartPlot', height = 800))
+      #downloadButton("exportPDF", "Export Figures")
+     )
+  ),
+
+
+    #################
+    # Export Panel  #
+    #################
+
+  tabPanel("Export", value = 'exportPanel',
+    div(class="outer",  style = "position:inherit; top: 0; left: 0; right: 0; bottom: 0; overflow: hidden; padding: 0;",
+      sidebarPanel(
+        #selectInput('whatToExport', "What to Export:", choices = c('Export Dart Pixels (xlsx)', 'Export Report (pdf)')),
+        downloadButton("exportPDF", "Export Report (pdf)"),
+        downloadButton("exportXLS", "Export Dart Pixels (xlsx)")#,
+      )
+    )
+  )
     
 )
 
@@ -106,7 +157,7 @@ server <- function(input, output, session) {
   ##########################################################################
   ##########################################################################
   v <- reactiveValues( msg = getwd(), msg2 = 'place holder', lat = 38.478, lng = -110.22, 
-                       dartResult = d
+                       dartResult = d, dartParams = list(), analysisDirections = "Select 'Run Dart' then 'Analyze' on the Interactive Map Menu to see plots"
                        )
   
   
@@ -163,7 +214,7 @@ server <- function(input, output, session) {
 
                showNotification(
                              attempt,duration = NULL, type = 'error'
-                       )
+                             )
                dartResult <- v$dartResult
             } else {
 
@@ -173,11 +224,42 @@ server <- function(input, output, session) {
                               
       #dartResult <- v$dartResult
       v$dartResult <- dartResult
+      
+      #cashe params
+      v$dartParams <- list( lng = v$lng, lat = v$lat, buffer = input$buffer, 
+                            searchRadius = input$searchRadius, targetRadius = input$targetRadius, 
+                            ncontrol = input$nControl, synthControlStartYear = input$dDate)
+
+      
+      # extract timeseries for targets + references
+      v$extraction <- extractDart( v$dartResult, 'SATVI' )
+      v$synthControl <- synthCtrl( v$extraction, input$dDate, 'SATVI' )
+      
+      ## Timeseries plots
+      output$myplot <- renderPlot( ts_plot(v$extraction, 'SATVI'),
+                                        height = function() {
+                                            #https://github.com/rstudio/shiny/issues/650
+                                            pmin(session$clientData$output_myplot_width *.6, 800)
+                                        }
+                                  )
+      
+      ## Synthetic Control Plots
+      output$scPlot <- renderPlot( plot(v$synthControl), height = function() {
+                                            #https://github.com/rstudio/shiny/issues/650
+                                            pmin(session$clientData$output_scPlot_width *.6, 800)
+                                        } )
+      
+      ## Variable importance Plots
+      output$cartPlot <- renderVisNetwork( viewImportance(v$dartResult))
+      
+      
+      showModal(modalDialog("Analysis Completed", footer= tagList(modalButton("OK"))))
+      
       chosen <- raster(dartResult$chosenPixels['distance'])
       targetRast <- raster(dartResult$targetRast['refrast'])
       cz <- colorNumeric(cols, values(chosen), na.color = "transparent")
       
-      # plot results
+      # plot results on map
       leafletProxy('mymap') %>%
           clearImages() %>%
           addRasterImage(dartResult$candidates, col = 'blue', opacity = 0.15, group = 'Candidates')%>%
@@ -190,52 +272,148 @@ server <- function(input, output, session) {
       
       }
    )
+  
+  ######################################
+  ## What to do when "Analyze" clicked #
+  ######################################
+  
+  # observeEvent(input$analyze,
+  # {
+     # strt <- format(Sys.time(), '%H:%M:%S')
+     # msg <- paste0("Extracting response variables -- this may take a while -- 
+                   # started at ",strt)
+     # showModal(modalDialog(msg, footer=NULL))
+       
+     # extract timeseries for targets + references
+     # v$extraction <- extractDart( v$dartResult, 'SATVI' )
+     # v$synthControl <- synthCtrl( v$extraction, input$dDate, 'SATVI' )
+     
+     # removeModal()
+
+     # generate a timeseries plot
+     
+        # output$myplot <- renderPlot( ts_plot(v$extraction, 'SATVI') )
+        # output$scPlot <- renderPlot( plot(v$synthControl) )
+     
+     # showModal(modalDialog("Analysis Finished", footer= tagList( actionButton('goto', "Go To"), modalButton("Dismiss"))))
+
+     # go to plot
+     # v$analysisDirections = ''
+   # })
+
+  ##################################################
+  # When analysis finished and user clicks 'go to' #
+  ##################################################
+
+    observeEvent(input$goto, {
+     updateTabsetPanel(session, "nav", selected = "analysisPanel")
+    })
+     
    
   #####################################
   ## What to do when 'Export' clicked #
   #####################################
   
-  # Downloadable csv of selected dataset ----
-   output$export <- downloadHandler(
+  # Downloadable xlsx of selected dataset ----
+  
+  output$exportPDF <- downloadHandler(
+
     filename = function() {
-      paste('DART_', round(v$lng,3), '_', round(v$lat,3),'_', format(Sys.time(), '%Y-%m-%d-%H-%M'), ".csv", sep = "")
+    
+      f <- paste('DART_', round(v$dartParams$lng,3), '_', round(v$dartParams$lat,3),'_', format(Sys.time(), '%Y-%m-%d-%H-%M'), ".pdf", sep = "")
+     
     },
     content = function(file) {
-      write.csv(datasetInput(), file, row.names = FALSE)
+      
+         searchPoly <- project( getTarget( v$dartParams$lng, v$dartParams$lat, 
+                             v$dartParams$searchRadius + v$dartParams$targetRadius))
+      
+         dartPoly <- project( getTarget ( v$dartParams$lng, v$dartParams$lat, v$dartParams$targetRadius) )
+      
+         bufferPoly <- project( getTarget ( v$dartParams$lng, v$dartParams$lat, v$dartParams$buffer + v$dartParams$targetRadius))
+         chosen <- raster(v$dartResult$chosenPixels['distance'])
+          targetRast <- raster(v$dartResult$targetRast['refrast'])
+          cz <- colorNumeric(cols, values(chosen), na.color = "transparent")
+           
+         
+         
+         params = list(
+            dartParams = v$dartParams,
+            bigMap = leaflet() %>%
+                     addTiles(urlTemplate = mapTilesUrlTemplate) %>%
+                     setView(lng = -110.22, lat = 38, zoom = 6) %>%
+                     addMarkers(lng = v$dartParams$lng, lat = v$dartParams$lat) %>%
+                     addPolygons(data = ss, fillColor='transparent', dashArray = '10',col = 'white', group = "Polygons"),
+            smallMap = leaflet() %>%
+                     addTiles(urlTemplate = mapTilesUrlTemplate) %>%
+                     addPolygons(data = dartPoly, fillColor='transparent', group = "Polygons")%>%
+                     addPolygons(data = searchPoly, color = 'red', fillColor='transparent', group = "Polygons")%>%
+                     addPolygons(data = bufferPoly, color = 'red', dashArray = '10',fillColor='transparent', group = "Polygons") %>%
+                     setView(lng = v$dartParams$lng, lat = v$dartParams$lat, zoom = 14),
+            dartMap = leaflet() %>%
+                     addTiles(urlTemplate = mapTilesUrlTemplate) %>%
+                     addRasterImage(v$dartResult$edaphicRaster, col = 'green', opacity = 0.25, group = 'Edaphic Subset')%>%
+                     addRasterImage(targetRast, col = 'purple', opacity = 1, group = 'Target Pixels')%>%
+                      addRasterImage(chosen, colors = cz, opacity = 1, group = 'Topo-edaphic Matches')%>%
+                     setView(lng = v$dartParams$lng, lat = v$dartParams$lat, zoom = 14),
+         
+            extraction = v$extraction,
+            dartOutput = v$dartResult,
+            sc = v$synthControl
+         )
+         
+         generateRmdReport(file, params)
+      }
+    
+  )
+  
+
+
+output$exportXLS <- downloadHandler(
+
+    filename = function() {
+    
+      f <- paste('DART_', round(v$dartParams$lng,3), '_', round(v$dartParams$lat,3),'_', format(Sys.time(), '%Y-%m-%d-%H-%M'), ".xlsx", sep = "")
+     
+    },
+    
+    content = function(file) {  
+  
+  
+         writexl::write_xlsx(datasetInput(), path = file)
+      
     }
   )
   
   # Data prepper
   datasetInput <- reactive({
-    require(data.table)
-    ref <- as.data.table(project(v$dartResult$chosenPixels))
-    target <- as.data.table(project(v$dartResult$targetRast))
+
+    # Dart pixels
+    ref <- as.data.frame(project(v$dartResult$chosenPixels))
+    target <- as.data.frame(project(v$dartResult$targetRast))
     ref$type <- 'dartReference'
     target$type <- 'target'
 
-    str(ref)
-    str(target)
-    cat('im here\n')
-    
-    meta <- jsonlite::toJSON( list(  lat = v$lat, lng = v$lng, date = Sys.time(), 
-                        targetRadius = input$targetRadius,
-                        searchRadius = input$searchRadius,
-                        buffer = input$buffer,
-                        nControl = input$nControl) , auto_unbox = TRUE)
-    
-    metadata <- target[1,]
-    metadata$type <- 'metadata'
-    metadata$x  <- metadata$y <- metadata$freq <- metadata$distance <- metadata$soilps <- NA
-    metadata$soilec <- meta
-    
-    
-   # out <- data.table::rbindlist(list(metadata, target, ref), fill = TRUE)
     out <- data.table::rbindlist(list(target, ref), fill = TRUE)
-    out <- out[ , list( type, x, y, freq, distance, soilps, soilec)]
-    
+    out <- out[ , c( 'type', 'x', 'y', 'freq', 'distance', 'soilps', 'soilec', names(dpar$topoVars)), with =F ]
+
     setnames(out, 'freq', 'freqSelected')
     setnames(out, 'distance', 'avgTopoDist')
-    out
+    setnames(out, 'soilps', 'soilParticleSizeClass')
+    
+    # Metadata
+    dp <- v$dartParams
+    kv <-   c(dartVersion = '2.0', lat = dp$lat, lng = dp$lng, date = format(Sys.time(), '%Y-%m-%d %H:%M:%S'), 
+                        targetRadius = dp$targetRadius,
+                        searchRadius = dp$searchRadius,
+                        buffer = dp$buffer,
+                        nControl = dp$nControl)
+    meta <- data.frame(key = names(kv), value = kv)
+    
+    # Quantiles
+    quants <- getQuantiles(v$extraction, 'SATVI')
+    
+    list( metadata = meta, DartPixels = as.data.frame(out), quantiles = quants)
     
   })
 
@@ -250,7 +428,7 @@ server <- function(input, output, session) {
   # Background Map
   output$mymap <- renderLeaflet({
       leaflet() %>%
-      addTiles(urlTemplate = '//server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}') %>%
+      addTiles(urlTemplate = mapTilesUrlTemplate) %>%
       setView(lng = -110.22, lat = 38, zoom = 6) %>%
       clearShapes() %>%
       addPolygons(data = ss, fillColor='transparent', dashArray = '10',col = 'white', group = "Polygons")
@@ -267,6 +445,9 @@ server <- function(input, output, session) {
         print(v$msg)
   })
 
+  output$analysisDirections <- renderPrint({
+        print(v$analysisDirections)
+  })
     
 }
 

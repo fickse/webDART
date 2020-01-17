@@ -53,7 +53,7 @@ dpar <- list(
 
     ## response variables
     respVars = list(
-     satvi = "/home/steve/data/GIS_ARCHIVE/EE/SATVI/satvi_median_1984_2018_Mar_Nov.vrt"
+     SATVI = "/home/steve/data/GIS_ARCHIVE/EE/SATVI/satvi_median_1984_2018_Mar_Nov.vrt"
     )
     
 
