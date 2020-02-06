@@ -97,14 +97,14 @@ getTarget <- function(x,y, targetRadius){
 getRasterData <- function(target, searchRadius){
 
    cat(' ** loading raster data\n')
-      
+   
    get_fun <- function(x) { 
        
-        s <- lapply( names(x), function(y) {  r <- brick(x[[y]]) ; names(r) <- y; r})
+        s <- lapply( names(x), function(y) {  r <- brick(x[[y]]) ;cat(y,'\n'); names(r) <- y; r})
         stack(s)
    
    }
-   
+   cat( sapply(dpar$topoVars, file.exists), '\n')
    toponames <- gsub(".tif","", names(dpar$topoVars))
    masks <- get_fun(dpar$maskVars)
    topovars <- get_fun(dpar$topoVars)
