@@ -208,6 +208,15 @@ cd ~/shinyproxy
 java -jar shinyproxy-2.3.0.jar
 
 ## to deploy
+
+# download 'deb' file which sets up systemd implementation
+wget https://www.shinyproxy.io/downloads/shinyproxy_2.3.0_amd64.deb
+sudo dpkg -i shinyproxy_2.3.0_amd64.deb
+
+# move config files to
 sudo cp application.yml /etc/shinyproxy/application.yml
+
+# systemd file /etc/systemd/system/shinyproxy.service should contain line
+# ExecStart=/usr/bin/java -jar /opt/shinyproxy/shinyproxy.jar
 
 ```
