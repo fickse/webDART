@@ -25,6 +25,7 @@
 
 cat('starting\n')
 library(shiny)
+#library(shinyjs)
 library(leaflet)
 library(raster)
 library(data.table)
@@ -54,8 +55,22 @@ targetRadius = 30
 debugMessage = TRUE
 
 
-ui <- navbarPage('webDART', id = 'nav', inverse = TRUE, collapsible = FALSE,position = 'fixed-bottom',
+ui <- tagList(
 
+  # adjust menu based on screen size
+  tags$head(tags$style(HTML("
+
+      @media screen and (max-width: 500px) {
+        #demox {
+          width: 60%;
+        }
+
+      }
+      "))),
+  
+  navbarPage('webDART', id = 'nav', inverse = TRUE, collapsible = FALSE,position = 'fixed-bottom',
+
+             
   tabPanel("Interactive Map",
    div(class="outer",  style = "position: fixed; top: 0; left: 0; right: 0; bottom: 0; overflow: hidden; padding: 0;",value = 'mapPanel',
     #tags$style(type = "text/css", "html, body {width:100%;height:100%}"),
@@ -72,9 +87,10 @@ ui <- navbarPage('webDART', id = 'nav', inverse = TRUE, collapsible = FALSE,posi
     absolutePanel( 
       style = "opacity: 0.92", draggable= TRUE, top = 10, left = 50,  width = 500,
       HTML('<button data-toggle="collapse" data-target="#demox">Menu</button>'),
-      tags$div(id='demox', class="collapse", 
+      tags$div(id='demox', class="collapse", style = "overflow-y:scroll; max-height: 500px",
 
           wellPanel(
+
           actionButton("runDart", "Run Dart"),# actionButton('analyze', 'Analyze'),
           sliderInput("targetRadius", "Target Area Radius (m)", min = 0, max = 300, step = 30, value = 30), 
           sliderInput("searchRadius", "Search Area Radius (m)", min = 500, max = 6000, step = 500, value = 3000),
@@ -85,7 +101,8 @@ ui <- navbarPage('webDART', id = 'nav', inverse = TRUE, collapsible = FALSE,posi
           )
        )
       ),
-     
+
+ 
      ###############
      # Plot Panel  #
      ###############
@@ -110,7 +127,8 @@ ui <- navbarPage('webDART', id = 'nav', inverse = TRUE, collapsible = FALSE,posi
       )
     }
     
-   )
+    )
+#   )
   ),
     
 
@@ -145,7 +163,7 @@ ui <- navbarPage('webDART', id = 'nav', inverse = TRUE, collapsible = FALSE,posi
     
 )
 
-
+)
 
 cols <- c("#9E0142", "#D53E4F", "#F46D43", "#FDAE61", "#FEE08B", "#FFFFBF", "#E6F598", "#ABDDA4", "#66C2A5", "#3288BD", "#5E4FA2")
 
@@ -272,7 +290,16 @@ server <- function(input, output, session) {
       
       }
    )
-  
+
+  #####################################
+  ## Toggle Menu                      #
+  #####################################
+
+   observeEvent(input$Menu, {
+       shinyjs::toggle(id = "Sidebar")
+   })
+    
+    
   ######################################
   ## What to do when "Analyze" clicked #
   ######################################
